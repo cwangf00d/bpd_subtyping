@@ -59,9 +59,11 @@ def make_dfs(df, grades, window_size, days, dft_cols, sft_cols, output_path):
     """
     will return full averaged dataframe acc to window size + will return a separate vectorized dataframe as tuple
     """
-    w_df = make_windows(df, window_size, grades, days)
-    v_df = vectorize(w_df, dft_cols, sft_cols, int(days/window_size))
-    w_df.to_csv(output_path + 'w_df.csv', index=False)
+    if window_size != 1:
+        w_df = make_windows(df, window_size, grades, days)
+        w_df.to_csv(output_path + 'w_df.csv', index=False)
+        v_df = vectorize(w_df, dft_cols, sft_cols, int(days/window_size))
+    v_df = vectorize(df, dft_cols, sft_cols, int(days))
     v_df.to_csv(output_path + 'v_df.csv')
-    return w_df, v_df
+    return v_df
 

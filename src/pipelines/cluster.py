@@ -423,3 +423,20 @@ def make_clusters(curr_df, output_path, save_csv=True, visualize=True):
         curr_cluster_df.to_csv(output_path, index=False)
     else:
         return curr_cluster_df
+
+
+def make_clusters_sl(curr_df, output_path, save_csv=True, visualize=True):
+    # prep data + perform reduction
+    curr_df = curr_df.dropna(axis=0)
+    curr_X = make_X(curr_df)
+    umap_X = make_UMAP(curr_X, n_n=15, n_c=10, min_d=0.1).values
+    # prepare storage dataframe for clusters
+    curr_cluster_df = create_cluster_df(curr_df, to_add=['PatientSeqID'])
+    # run clustering algorithms
+    pca_nc = silhouette_KM_clusterer(umap_X)
+    make_kmeans(umap_X, curr_cluster_df, pca_nc, 'umap_KMeans', visualize=False)
+    # save to csv
+    if save_csv:
+        curr_cluster_df.to_csv(output_path, index=False)
+    else:
+        return curr_cluster_df
