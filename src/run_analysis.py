@@ -3,9 +3,9 @@
 #################################################################################
 import pandas as pd
 from src.pipelines.vectorize import fup_day, make_dfs
-from src.pipelines.cluster import make_clusters
-from src.pipelines.validate import run_bootstrap, get_silhouette_scores
-from src.pipelines.risk_match import expected_risk
+from src.pipelines.cluster import make_clusters_sl
+from src.pipelines.validate import run_bootstrap_sl
+from src.pipelines.risk_match import expected_risk, matched_risk
 
 #################################################################################
 # Data Handling                                                                 #
@@ -28,8 +28,8 @@ DAYS = [1, 3, 7, 14, 21, 28]
 ##########################################
 # Vectorize                              #
 ##########################################
-# TRANSFORMER DATASETS
-# reading in internal/external embeddings + combining into one transformer csv
+# # TRANSFORMER DATASETS
+# # reading in internal/external embeddings + combining into one transformer csv
 # ti_df = pd.read_csv(DATA_DIR_PATH + 'predictions/internal_embeddings.csv')
 # te_df = pd.read_csv(DATA_DIR_PATH + 'predictions/external_embeddings.csv')
 # t_cols = ['PatientSeqID', 'DSB', 'Support_Level_36'] + list(ti_df.columns)[3:]
@@ -37,8 +37,8 @@ DAYS = [1, 3, 7, 14, 21, 28]
 # ta_df = pd.concat([ti_df, te_df])
 # ta_df = ta_df.drop(columns=['Support_Level_36'])
 # # merging to get bpd grade status + filter by inclusion criteria across specific days
-# dis_df = pd.read_csv(DATA_DIR_PATH + 'discharge_bpd_status.csv')
-# pm_df = pd.read_csv(DATA_DIR_PATH + 'patient_manifest.csv')
+dis_df = pd.read_csv(DATA_DIR_PATH + 'discharge_bpd_status.csv')
+pm_df = pd.read_csv(DATA_DIR_PATH + 'patient_manifest.csv')
 # for day in DAYS:
 #     tv_df = fup_day(ta_df, day).merge((dis_df.merge(pm_df)).loc[:, ['PatientSeqID', 'BPD Grade']])
 #     tv_df.to_csv(DATA_DIR_PATH + '/processed/full/tv_' + str(day) + '_df.csv', index=False)
@@ -52,8 +52,8 @@ DAYS = [1, 3, 7, 14, 21, 28]
 ##########################################
 # Risk Matching                          #
 ##########################################
-'''The point is to make a dataframe that has Patient ID, DSB, Risk altogether for ease in separating
-    moving forward'''
+# '''The point is to make a dataframe that has Patient ID, DSB, Risk altogether for ease in separating
+#     moving forward'''
 # # reading in internal/external risk predictions + combining into one transformer csv
 # tir_df = pd.read_csv(DATA_DIR_PATH + 'predictions/test_internal.csv')
 # ter_df = pd.read_csv(DATA_DIR_PATH + 'predictions/test_external.csv')
@@ -64,7 +64,10 @@ DAYS = [1, 3, 7, 14, 21, 28]
 # tar_df = expected_risk(tar_df)
 # # saving to csv for easy access later
 # tar_df.to_csv(DATA_DIR_PATH + '/processed/full/tar_df.csv', index=False)
-
+#
+# # to run over various timeframes and create risk datasets for each, we can use the following:
+# for day in DAYS:
+#     matched_risk(tar_df, day, DATA_DIR_PATH + '/processed/risk/tga_')
 
 ##########################################
 # Clustering                             #
@@ -85,35 +88,33 @@ setup:
     print('all clusters complete')
 '''
 
-# v_suffix = 'v_df.csv'
-# c_suffix = 'c_df.csv'
-# tgat1c_df = pd.read_csv(CDATA_DIR_PATH + 'tgat1c_df.csv')
-# tgat1cb_pids = list(tgat1c_df.loc[tgat1c_df['umap_KMeans'] == 1]['PatientSeqID'])
-# tgat1v_df = pd.read_csv(VDATA_DIR_PATH + 'tgat1v_df.csv')
-# tgat1cbv_df = tgat1v_df.loc[tgat1v_df['PatientSeqID'].isin(tgat1cb_pids)]
-# tgat1cbv_df.to_csv(VDATA_DIR_PATH + 'tgat1cbv_df.csv', index=False)
-# to_cluster = ['tgat1cb']
+# PASS 1
+v_suffix = 'v_df.csv'
+c_suffix = 'c_df.csv'
+to_cluster = ['tga_d1_', 'tga_d3_', 'tga_d7_', 'tga_d14_', 'tga_d21_', 'tga_d28_']
+
+for dataset in to_cluster:
+    print('loading', dataset)
+    curr_df = pd.read_csv(VDATA_DIR_PATH + dataset + v_suffix)
+    make_clusters_sl(curr_df, CDATA_DIR_PATH + dataset + c_suffix)
+    print(dataset, 'cluster complete')
+print('all clusters complete')
+
+# # PASS 2
+# to_cluster = ['tga_d1g0_', 'tga_d1g1_', 'tga_d1g2_', 'tga_d1g3_', 'tga_d1g4_',
+#               'tga_d3g0_', 'tga_d3g1_', 'tga_d3g2_', 'tga_d3g3_', 'tga_d3g4_',
+#               'tga_d7g0_', 'tga_d7g1_', 'tga_d7g2_', 'tga_d7g3_', 'tga_d7g4_',
+#               'tga_d14g0_', 'tga_d14g1_', 'tga_d14g2_', 'tga_d14g3_', 'tga_d14g4_',
+#               'tga_d21g0_', 'tga_d21g1_', 'tga_d21g2_', 'tga_d21g3_', 'tga_d21g4_',
+#               'tga_d28g0_', 'tga_d28g1_', 'tga_d28g2_', 'tga_d28g3_', 'tga_d28g4_']
+#
+# r_suffix = 'r_df.csv'
 # for dataset in to_cluster:
 #     print('loading', dataset)
 #     curr_df = pd.read_csv(VDATA_DIR_PATH + dataset + v_suffix)
-#     make_clusters(curr_df, CDATA_DIR_PATH + dataset + c_suffix)
+#     make_clusters_sl(curr_df, CDATA_DIR_PATH + dataset + c_suffix)
 #     print(dataset, 'cluster complete')
 # print('all clusters complete')
-
-# TODO get this working for risk matching
-
-# to_cluster = ['tg0d7r', 'tg1d7r', 'tg2d7r', 'tg3d7r']  # risk matched groups
-# day = 7
-# tar_df = pd.read_csv(DATA_DIR_PATH + '/processed/full/tar_df.csv')
-# for i, dataset in enumerate(to_cluster):
-#     print('loading', dataset)
-#     curr_df = pd.read_csv(VDATA_DIR_PATH + 'tgat1' + v_suffix)
-#     patient_ids = list(tar_df.loc[(tar_df['Risk'] == i) & (tar_df['DSB'] == day)]['PatientSeqID'])
-#     curr_df = curr_df.loc[curr_df['PatientSeqID'].isin(patient_ids)]
-#     make_clusters(curr_df, CDATA_DIR_PATH + 'tg0r' + c_suffix)
-#     print(dataset, 'cluster done')
-# print('all clusters done')
-
 
 ##########################################
 # Cluster Validation                     #
@@ -138,15 +139,17 @@ setup:
         run_bootstrap(curr_v_df, curr_c_df, curr_n, BOOTSTRAP_REPS, bs_output)
         print('bootstrap complete!')
 '''
-to_bootstrap = ['tgat1cb']
+to_bootstrap = ['tga_d1_', 'tga_d3_', 'tga_d7_', 'tga_d14_', 'tga_d21_', 'tga_d28_']
+# to_bootstrap = ['tga_d1_']
+
 for data in to_bootstrap:
     print('loading in', data)
     curr_c_df = pd.read_csv(CDATA_DIR_PATH + data + c_suffix)
     curr_v_df = pd.read_csv(VDATA_DIR_PATH + data + v_suffix)
     curr_n = curr_c_df.shape[0]
-    bs_output = SDATA_DIR_PATH + data + '_bs.json'
-    ss_output = SDATA_DIR_PATH + data + '_ss.json'
-    run_bootstrap(curr_v_df, curr_c_df, curr_n, BOOTSTRAP_REPS, bs_output)
+    bs_output = SDATA_DIR_PATH + data + 'bs.json'
+    ss_output = SDATA_DIR_PATH + data + 'ss.json'
+    run_bootstrap_sl(curr_v_df, curr_c_df, curr_n, BOOTSTRAP_REPS, bs_output)
     print('bootstrap complete!')
 
 # TODO: figure out unit-testing of get_silhouette_scores

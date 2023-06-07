@@ -433,7 +433,7 @@ def make_clusters_sl(curr_df, output_path, save_csv=True, visualize=True):
     # prepare storage dataframe for clusters
     curr_cluster_df = create_cluster_df(curr_df, to_add=['PatientSeqID'])
     # run clustering algorithms
-    pca_nc = silhouette_KM_clusterer(umap_X)
+    pca_nc = silhouette_KM_clusterer(umap_X, visualize=False)
     make_kmeans(umap_X, curr_cluster_df, pca_nc, 'umap_KMeans', visualize=False)
     # save to csv
     if save_csv:

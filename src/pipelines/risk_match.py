@@ -17,11 +17,29 @@ def expected_risk(df):
     w_df['grade_2_prob'] = df['prob_3'] + df['prob_4'] + df['prob_5']
     w_df['grade_3_prob'] = df['prob_6'] + df['prob_7']
     w_df['grade_minus1_prob'] = df['prob_8']
-    w_df['expected_grade'] = 4*w_df['grade_minus1_prob'] + 0*w_df['grade_0_prob'] + 1*w_df['grade_1_prob'] + \
-                             2*w_df['grade_2_prob'] + 3*w_df['grade_3_prob']
-    w_df['int_exp_grade'] = round(w_df['expected_grade'])
     w_df.columns = ['PatientSeqID', 'DSB', 'Label'] + list(w_df.columns[3:])
     return w_df
+
+
+def matched_risk(df, o_df, day, output_path):
+    mr_suffix = '_mr_df.csv'
+    r_suffix = '_r_df.csv'
+    # take a df with risk broken down into the 5 classes; draw histograms for each class; choose top 10%
+    results = {}
+    # Loop over the columns, excluding the 'Patient_ID' column
+    for i, column in enumerate(df.columns.drop(['PatientSeqID', 'DSB', 'Label'])):
+        # Sort dataframe by column values in descending order
+        df_sorted = df.loc[df['DSB'] == day].sort_values(by=column, ascending=False)
+        # Get the top 10% rows
+        top_10_percent = df_sorted.head(round(int(len(df_sorted) * 0.1)))
+        # Store the patient ID and the relevant class's probability into the dictionary
+        top_10_percent.to_csv(output_path + 'd' + str(day) + 'g' + str(i) + mr_suffix, index=False)
+        pids = list(top_10_percent['PatientSeqID'])
+        # make dataframe with all patient data
+        risk_df = o_df.loc[o_df['PatientSeqID'].isin(pids)]
+        risk_df.to_csv(output_path + 'd' + str(day) + 'g' + str(i) + r_suffix, index=False)
+        results[column] = top_10_percent[['PatientSeqID', column]]
+    return results
 
 
 def weighted_risk(df, ft_inds=range(3, 12)):

@@ -4,7 +4,7 @@
 import numpy as np
 from sklearn.metrics import silhouette_score, jaccard_score
 import json
-from src.pipelines.cluster import make_clusters, make_UMAP, make_X, make_95_PCA
+from src.pipelines.cluster import make_clusters, make_UMAP, make_X, make_95_PCA, make_clusters_sl
 
 
 #################################################################################
@@ -68,17 +68,16 @@ def run_bootstrap_sl(v_df, c_df, n, num_reps, json_output_path):
     # combine v_df, c_df so no errors when sampling
     cv_df = v_df.merge(c_df)
     # derive cols from the dataframe
-    cluster_cols = list(c_df.columns)[1:]  # check if this is right when debugging, one cluster col
-    ft_cols = list(v_df.columns)[1:]  # also check this one
+    cluster_cols = list(c_df.columns)[1:]
+    ft_cols = list(v_df.columns)[1:]
     jcs_dict = create_bootstrap_dict(cluster_cols, c_df)
     for i in range(num_reps):
         # sampling + setting up data
         sample_df = cv_df.sample(n=n, replace=True)
         sample_df = sample_df.dropna(axis=1)
-        sample_ids = list(sample_df['PatientSeqID'])
         oc_df = sample_df.loc[:, ['PatientSeqID'] + cluster_cols]  # storing original clusters for comparison
         sample_v_df = sample_df.loc[:, ['PatientSeqID'] + ft_cols]
-        nc_df = make_clusters(sample_v_df, 'no_output', save_csv=False, visualize=False)
+        nc_df = make_clusters_sl(sample_v_df, 'no_output', save_csv=False, visualize=False)
         # calculating Jaccard coefficients
         jcs_dict = calc_jaccard(nc_df, oc_df, cluster_cols, jcs_dict)
     # bootstrap averaging
