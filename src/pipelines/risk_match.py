@@ -42,6 +42,15 @@ def matched_risk(df, o_df, day, output_path):
     return results
 
 
+def jensen_risk(df):
+    # create new columns for each grade's probability
+    w_df = df.copy().loc[:, ['Patient', 'Day', 'Label']]
+    w_df['grade_01_prob'] = df['prob_1'] + df['prob_2']
+    w_df['grade_234_prob'] = df['prob_3'] + df['prob_4'] + df['prob_5'] + df['prob_6'] + df['prob_7'] + df['prob_8']
+    w_df.columns = ['PatientSeqID', 'DSB', 'Label'] + list(w_df.columns[3:])
+    return w_df
+
+
 def weighted_risk(df, ft_inds=range(3, 12)):
     weights = [i for i in range(9)]
     curr_df = df.iloc[:, ft_inds]*weights

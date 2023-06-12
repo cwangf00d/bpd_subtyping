@@ -5,7 +5,7 @@ import pandas as pd
 from src.pipelines.vectorize import fup_day, make_dfs
 from src.pipelines.cluster import make_clusters_sl
 from src.pipelines.validate import run_bootstrap_sl
-from src.pipelines.risk_match import expected_risk, matched_risk
+from src.pipelines.risk_match import expected_risk, matched_risk, jensen_risk
 
 #################################################################################
 # Data Handling                                                                 #
@@ -18,11 +18,11 @@ DATA_DIR_PATH = '/Users/cindywang/PycharmProjects/bpd-subtyping/data/'  # local
 VDATA_DIR_PATH = DATA_DIR_PATH + 'processed/vector/'
 CDATA_DIR_PATH = DATA_DIR_PATH + 'processed/clusters/'
 SDATA_DIR_PATH = DATA_DIR_PATH + 'processed/scores/'
-# OUTPUT_PATH = DATA_DIR_PATH + 'processed/vector/'
+RDATA_DIR_PATH = DATA_DIR_PATH + 'processed/risk/'
 print('variables set')
 
 # timeframes
-DAYS = [1, 3, 7, 14, 21, 28]
+DAYS = [1, 3, 7, 14, 21, 27]
 
 
 ##########################################
@@ -52,22 +52,32 @@ pm_df = pd.read_csv(DATA_DIR_PATH + 'patient_manifest.csv')
 ##########################################
 # Risk Matching                          #
 ##########################################
-# '''The point is to make a dataframe that has Patient ID, DSB, Risk altogether for ease in separating
-#     moving forward'''
-# # reading in internal/external risk predictions + combining into one transformer csv
-# tir_df = pd.read_csv(DATA_DIR_PATH + 'predictions/test_internal.csv')
-# ter_df = pd.read_csv(DATA_DIR_PATH + 'predictions/test_external.csv')
-# tar_df = pd.concat([tir_df, ter_df])
-# inclusion_criteria = list(pm_df['PatientSeqID'])
-# tar_df = tar_df.loc[tar_df['Patient'].isin(inclusion_criteria)]
-# # assign risk
-# tar_df = expected_risk(tar_df)
-# # saving to csv for easy access later
-# tar_df.to_csv(DATA_DIR_PATH + '/processed/full/tar_df.csv', index=False)
-#
+'''The point is to make a dataframe that has Patient ID, DSB, Risk altogether for ease in separating
+    moving forward'''
+# reading in internal/external risk predictions + combining into one transformer csv
+tir_df = pd.read_csv(DATA_DIR_PATH + 'predictions/test_internal.csv')
+ter_df = pd.read_csv(DATA_DIR_PATH + 'predictions/test_external.csv')
+tar_df = pd.concat([tir_df, ter_df])
+inclusion_criteria = list(pm_df['PatientSeqID'])
+tar_df = tar_df.loc[tar_df['Patient'].isin(inclusion_criteria)]
+# assign risk
+tjr_df = jensen_risk(tar_df)
+tar_df = expected_risk(tar_df)
+# saving to csv for easy access later
+tar_df.to_csv(DATA_DIR_PATH + '/processed/full/tar_df.csv', index=False)
+tjr_df.to_csv(DATA_DIR_PATH + '/processed/full/tjr_df.csv', index=False)
 # # to run over various timeframes and create risk datasets for each, we can use the following:
-# for day in DAYS:
-#     matched_risk(tar_df, day, DATA_DIR_PATH + '/processed/risk/tga_')
+# v_suffix = 'v_df.csv'
+# v_dfs = ['tga_d1_', 'tga_d3_', 'tga_d7_', 'tga_d14_', 'tga_d21_', 'tga_d27_']
+# for day, vdf in zip(DAYS, v_dfs):
+#     o_df = pd.read_csv(VDATA_DIR_PATH + vdf + v_suffix)
+#     matched_risk(tar_df, o_df, day, DATA_DIR_PATH + '/processed/risk/tga_')
+
+# to run over various timeframes and create risk datasets for each, we can use the following:
+v_suffix = 'v_df.csv'
+o_df = pd.read_csv(VDATA_DIR_PATH + 'tga_d27_' + v_suffix)
+for day in DAYS:
+    matched_risk(tar_df, o_df, day, DATA_DIR_PATH + '/processed/risk/t27g_')
 
 ##########################################
 # Clustering                             #
@@ -88,17 +98,38 @@ setup:
     print('all clusters complete')
 '''
 
-# PASS 1
+# # PASS 1
 v_suffix = 'v_df.csv'
 c_suffix = 'c_df.csv'
-to_cluster = ['tga_d1_', 'tga_d3_', 'tga_d7_', 'tga_d14_', 'tga_d21_', 'tga_d28_']
+u_suffix = 'u_df.csv'
+# to_cluster = ['tga_d1_', 'tga_d3_', 'tga_d7_', 'tga_d14_', 'tga_d21_', 'tga_d28_']
+# for dataset in to_cluster:
+#     print('loading', dataset)
+#     curr_df = pd.read_csv(VDATA_DIR_PATH + dataset + v_suffix)
+#     make_clusters_sl(curr_df, CDATA_DIR_PATH + 'new/' + dataset + c_suffix, CDATA_DIR_PATH + 'new/' + dataset + u_suffix,
+#     visualize=False)
+#     print(dataset, 'cluster complete')
+# print('all clusters complete')
 
-for dataset in to_cluster:
-    print('loading', dataset)
-    curr_df = pd.read_csv(VDATA_DIR_PATH + dataset + v_suffix)
-    make_clusters_sl(curr_df, CDATA_DIR_PATH + dataset + c_suffix)
-    print(dataset, 'cluster complete')
-print('all clusters complete')
+# # PASS 1.5: trying to not use random state to find most replicable clustering
+# v_suffix = 'v_df.csv'
+# c_suffix = 'c_df.csv'
+# u_suffix = 'u_df.csv'
+# to_cluster = ['tga_d1_', 'tga_d14_']
+# for dataset in to_cluster:
+#     print('loading', dataset)
+#     curr_df = pd.read_csv(VDATA_DIR_PATH + dataset + v_suffix)
+#     best_c_df, best_ss = make_clusters_sl(curr_df, 'no output', CDATA_DIR_PATH + dataset +
+#                                           u_suffix, save_csv=False, visualize=False, random=True)
+#     for i in range(50):
+#         curr_c_df, curr_ss = make_clusters_sl(curr_df, 'no output', CDATA_DIR_PATH + dataset +
+#                                               u_suffix, save_csv=False, visualize=False, random=True)
+#         if curr_ss > best_ss:
+#             best_c_df, best_ss = curr_c_df.copy(), curr_ss
+#             print('current best ss:', best_ss)
+#     best_c_df.to_csv(CDATA_DIR_PATH + dataset + c_suffix, index=False)
+#     print(dataset, 'cluster complete')
+# print('all clusters complete')
 
 # # PASS 2
 # to_cluster = ['tga_d1g0_', 'tga_d1g1_', 'tga_d1g2_', 'tga_d1g3_', 'tga_d1g4_',
@@ -106,15 +137,34 @@ print('all clusters complete')
 #               'tga_d7g0_', 'tga_d7g1_', 'tga_d7g2_', 'tga_d7g3_', 'tga_d7g4_',
 #               'tga_d14g0_', 'tga_d14g1_', 'tga_d14g2_', 'tga_d14g3_', 'tga_d14g4_',
 #               'tga_d21g0_', 'tga_d21g1_', 'tga_d21g2_', 'tga_d21g3_', 'tga_d21g4_',
-#               'tga_d28g0_', 'tga_d28g1_', 'tga_d28g2_', 'tga_d28g3_', 'tga_d28g4_']
+#               'tga_d27g0_', 'tga_d27g1_', 'tga_d27g2_', 'tga_d27g3_', 'tga_d27g4_']
 #
 # r_suffix = 'r_df.csv'
 # for dataset in to_cluster:
 #     print('loading', dataset)
-#     curr_df = pd.read_csv(VDATA_DIR_PATH + dataset + v_suffix)
-#     make_clusters_sl(curr_df, CDATA_DIR_PATH + dataset + c_suffix)
+#     curr_df = pd.read_csv(RDATA_DIR_PATH + dataset + r_suffix)
+#     make_clusters_sl(curr_df, CDATA_DIR_PATH + dataset + c_suffix, CDATA_DIR_PATH + dataset + u_suffix,
+#                      visualize=False)
 #     print(dataset, 'cluster complete')
 # print('all clusters complete')
+
+
+# PASS 2.5 risk with all data up to D27
+to_cluster = ['t27g_d1g0_', 't27g_d1g1_', 't27g_d1g2_', 't27g_d1g3_', 't27g_d1g4_',
+              't27g_d3g0_', 't27g_d3g1_', 't27g_d3g2_', 't27g_d3g3_', 't27g_d3g4_',
+              't27g_d7g0_', 't27g_d7g1_', 't27g_d7g2_', 't27g_d7g3_', 't27g_d7g4_',
+              't27g_d14g0_', 't27g_d14g1_', 't27g_d14g2_', 't27g_d14g3_', 't27g_d14g4_',
+              't27g_d21g0_', 't27g_d21g1_', 't27g_d21g2_', 't27g_d21g3_', 't27g_d21g4_',
+              't27g_d27g0_', 't27g_d27g1_', 't27g_d27g2_', 't27g_d27g3_', 't27g_d27g4_']
+
+r_suffix = 'r_df.csv'
+for dataset in to_cluster:
+    print('loading', dataset)
+    curr_df = pd.read_csv(RDATA_DIR_PATH + dataset + r_suffix)
+    make_clusters_sl(curr_df, CDATA_DIR_PATH + dataset + c_suffix, CDATA_DIR_PATH + dataset + u_suffix,
+                     visualize=False)
+    print(dataset, 'cluster complete')
+print('all clusters complete')
 
 ##########################################
 # Cluster Validation                     #
@@ -124,7 +174,7 @@ This will perform a set number of bootstrap replications for goal 2 of the three
 """
 # BOOTSTRAP + SILHOUETTE SCORES
 BOOTSTRAP_REPS = 100
-v_suffix = 'v_df.csv'
+u_suffix = 'u_df.csv'
 c_suffix = 'c_df.csv'
 '''
 setup:
@@ -139,17 +189,46 @@ setup:
         run_bootstrap(curr_v_df, curr_c_df, curr_n, BOOTSTRAP_REPS, bs_output)
         print('bootstrap complete!')
 '''
-to_bootstrap = ['tga_d1_', 'tga_d3_', 'tga_d7_', 'tga_d14_', 'tga_d21_', 'tga_d28_']
-# to_bootstrap = ['tga_d1_']
+# to_bootstrap = ['tga_d1_', 'tga_d3_', 'tga_d7_', 'tga_d14_', 'tga_d21_', 'tga_d28_']
+# cluster_col = 'umap_KMeans'
+# # to_bootstrap = ['tga_d1_', 'tga_d14_']
+# for data in to_bootstrap:
+#     print('loading in', data)
+#     curr_c_df = pd.read_csv(CDATA_DIR_PATH + 'new/' + data + c_suffix)
+#     num_clusters = len(list(set(curr_c_df[cluster_col])))
+#     curr_u_df = pd.read_csv(CDATA_DIR_PATH + 'new/' + data + u_suffix)
+#     curr_n = curr_c_df.shape[0]
+#     bs_output = SDATA_DIR_PATH + 'new/' + data + 'bs.json'
+#     # ss_output = SDATA_DIR_PATH + data + 'ss.json'
+#     run_bootstrap_sl(curr_u_df, curr_c_df, curr_n, BOOTSTRAP_REPS, bs_output, num_clusters)
+#     print('bootstrap complete!')
 
+# to_bootstrap = ['tga_d14g0_', 'tga_d14g1_', 'tga_d14g2_', 'tga_d14g3_', 'tga_d14g4_',
+#                 'tga_d21g0_', 'tga_d21g1_', 'tga_d21g2_', 'tga_d21g3_', 'tga_d21g4_',
+#                 'tga_d27g0_', 'tga_d27g1_', 'tga_d27g2_', 'tga_d27g3_', 'tga_d27g4_']
+# cluster_col = 'umap_KMeans'
+# for data in to_bootstrap:
+#     print('loading in', data)
+#     curr_c_df = pd.read_csv(CDATA_DIR_PATH + data + c_suffix)
+#     num_clusters = len(list(set(curr_c_df[cluster_col])))
+#     curr_u_df = pd.read_csv(CDATA_DIR_PATH + data + u_suffix)
+#     curr_n = curr_c_df.shape[0]
+#     bs_output = SDATA_DIR_PATH + data + 'bs.json'
+#     run_bootstrap_sl(curr_u_df, curr_c_df, curr_n, BOOTSTRAP_REPS, bs_output, num_clusters)
+#     print('bootstrap complete!')
+
+to_bootstrap = ['t27g_d14g0_', 't27g_d14g1_', 't27g_d14g2_', 't27g_d14g3_', 't27g_d14g4_',
+                't27g_d21g0_', 't27g_d21g1_', 't27g_d21g2_', 't27g_d21g3_', 't27g_d21g4_',
+                't27g_d27g0_', 't27g_d27g1_', 't27g_d27g2_', 't27g_d27g3_', 't27g_d27g4_']
+cluster_col = 'umap_KMeans'
 for data in to_bootstrap:
     print('loading in', data)
     curr_c_df = pd.read_csv(CDATA_DIR_PATH + data + c_suffix)
-    curr_v_df = pd.read_csv(VDATA_DIR_PATH + data + v_suffix)
+    num_clusters = len(list(set(curr_c_df[cluster_col])))
+    curr_u_df = pd.read_csv(CDATA_DIR_PATH + data + u_suffix)
     curr_n = curr_c_df.shape[0]
     bs_output = SDATA_DIR_PATH + data + 'bs.json'
-    ss_output = SDATA_DIR_PATH + data + 'ss.json'
-    run_bootstrap_sl(curr_v_df, curr_c_df, curr_n, BOOTSTRAP_REPS, bs_output)
+    run_bootstrap_sl(curr_u_df, curr_c_df, curr_n, BOOTSTRAP_REPS, bs_output, num_clusters)
     print('bootstrap complete!')
 
 # TODO: figure out unit-testing of get_silhouette_scores

@@ -268,14 +268,16 @@ def silhouette_hier_cluster(X, visualize=True):
     return avg_dict[np.max(np.array(avgs))]
 
 
-def silhouette_KM_clusterer(X, visualize=True):
-    range_n_clusters = [2, 3, 4, 5, 6]
+def silhouette_KM_clusterer(X, visualize=True, random=False, range_n_clusters=list(range(2, 7))):
     avgs = []
     avg_dict = {}
     for n_clusters in range_n_clusters:
         # Initialize the clusterer with n_clusters value and a random generator
         # seed of 10 for reproducibility.
-        clusterer = KMeans(n_clusters=n_clusters, random_state=10)
+        if not random:
+            clusterer = KMeans(n_clusters=n_clusters, random_state=10)
+        else:
+            clusterer = KMeans(n_clusters=n_clusters)
         cluster_labels = clusterer.fit_predict(X)
 
         # The silhouette_score gives the average value for all the samples.
@@ -376,7 +378,7 @@ def silhouette_KM_clusterer(X, visualize=True):
                 fontweight="bold",
             )
             plt.show()
-    return avg_dict[np.max(np.array(avgs))]
+    return avg_dict[np.max(np.array(avgs))], np.max(np.array(avgs))
 
 
 def make_kmeans(X, cluster_df, num_clusters, col_name, visualize=True):
@@ -405,8 +407,8 @@ def make_clusters(curr_df, output_path, save_csv=True, visualize=True):
             make_dendrogram(data_X, dr_type + ' dendrograms')
             make_hierarchical(data_X, curr_cluster_df, silhouette_hier_cluster(data_X), dr_type + '_Hier')
             # kmeans
-            pca_nc = silhouette_KM_clusterer(data_X)
-            make_kmeans(data_X, curr_cluster_df, pca_nc, dr_type + '_KMeans')
+            km, ss = silhouette_KM_clusterer(data_X)
+            make_kmeans(data_X, curr_cluster_df, km, dr_type + '_KMeans')
     else:
         for data_X, dr_type in tqdm(zip([pca_X, umap_X], ['pca', 'umap'])):
             # dbscan
@@ -416,8 +418,8 @@ def make_clusters(curr_df, output_path, save_csv=True, visualize=True):
             make_hierarchical(data_X, curr_cluster_df, silhouette_hier_cluster(data_X, visualize=False),
                               dr_type + '_Hier', visualize=False)
             # kmeans
-            pca_nc = silhouette_KM_clusterer(data_X, visualize=False)
-            make_kmeans(data_X, curr_cluster_df, pca_nc, dr_type + '_KMeans', visualize=False)
+            km, ss = silhouette_KM_clusterer(data_X, visualize=False)
+            make_kmeans(data_X, curr_cluster_df, km, dr_type + '_KMeans', visualize=False)
     # save to csv
     if save_csv:
         curr_cluster_df.to_csv(output_path, index=False)
@@ -425,18 +427,27 @@ def make_clusters(curr_df, output_path, save_csv=True, visualize=True):
         return curr_cluster_df
 
 
-def make_clusters_sl(curr_df, output_path, save_csv=True, visualize=True):
-    # prep data + perform reduction
+def make_clusters_sl(curr_df, c_output_path, u_output_path, save_csv=True, visualize=True, umap=False,
+                     random=False, bootstrap=None):
     curr_df = curr_df.dropna(axis=0)
-    curr_X = make_X(curr_df)
-    umap_X = make_UMAP(curr_X, n_n=15, n_c=10, min_d=0.1).values
+    umap_X = make_X(curr_df)
+    if not umap:
+        # prep data + perform reduction
+        umap_df = make_UMAP(umap_X, n_n=15, n_c=10, min_d=0.1)
+        umap_X = umap_df.values
+        umap_df.insert(loc=0, column='PatientSeqID', value=curr_df['PatientSeqID'])
+        umap_df.to_csv(u_output_path, index=False)
     # prepare storage dataframe for clusters
     curr_cluster_df = create_cluster_df(curr_df, to_add=['PatientSeqID'])
     # run clustering algorithms
-    pca_nc = silhouette_KM_clusterer(umap_X, visualize=False)
-    make_kmeans(umap_X, curr_cluster_df, pca_nc, 'umap_KMeans', visualize=False)
+    if not bootstrap:
+        km, ss = silhouette_KM_clusterer(umap_X, visualize, random)
+        make_kmeans(umap_X, curr_cluster_df, km, 'umap_KMeans', visualize)
+    else:
+        km, ss = silhouette_KM_clusterer(umap_X, visualize, random, range_n_clusters=[bootstrap])
+        make_kmeans(umap_X, curr_cluster_df, bootstrap, 'umap_KMeans', visualize)
     # save to csv
     if save_csv:
-        curr_cluster_df.to_csv(output_path, index=False)
+        curr_cluster_df.to_csv(c_output_path, index=False)
     else:
-        return curr_cluster_df
+        return curr_cluster_df, ss

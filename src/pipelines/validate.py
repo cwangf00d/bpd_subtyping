@@ -3,6 +3,7 @@
 #################################################################################
 import numpy as np
 from sklearn.metrics import silhouette_score, jaccard_score
+from sklearn.metrics.cluster import adjusted_rand_score
 import json
 from src.pipelines.cluster import make_clusters, make_UMAP, make_X, make_95_PCA, make_clusters_sl
 
@@ -18,11 +19,19 @@ def calc_jaccard(newc_df, origc_df, columns, scores_dict):
             o_clust_ids = list(origc_df.loc[origc_df[c_alg] == o_clust]['PatientSeqID'])
             f_newc = np.array(newc_df.loc[newc_df['PatientSeqID'].isin(o_clust_ids)][c_alg])
             for n_clust in nc_clusters:
-                f_origc = np.array([n_clust for id in o_clust_ids])
+                f_origc = np.array([n_clust for _ in o_clust_ids])
                 curr_js.append(jaccard_score(f_newc, f_origc, average='weighted'))
             scores_dict[c_alg][o_clust].append(np.max(np.array(curr_js)))
     # print(scores_dict)
     return scores_dict
+
+
+def calc_ari(newc_df, origc_df, columns, ari_scores_dict):
+    for c_alg in columns:
+        nc_clusters, oc_clusters = list((newc_df[c_alg])), list((origc_df[c_alg]))
+        ari_score = adjusted_rand_score(nc_clusters, oc_clusters)
+        ari_scores_dict[c_alg].append(ari_score)
+    return ari_scores_dict
 
 
 def create_bootstrap_dict(columns, orig_df):
@@ -50,7 +59,7 @@ def run_bootstrap(v_df, c_df, n, num_reps, json_output_path):
         sample_ids = list(sample_df['PatientSeqID'])
         oc_df = sample_df.loc[:, ['PatientSeqID'] + cluster_cols]  # storing original clusters for comparison
         sample_v_df = sample_df.loc[:, ['PatientSeqID'] + ft_cols]
-        nc_df = make_clusters(sample_v_df, 'no_output', save_csv=False, visualize=False)
+        nc_df, ss = make_clusters(sample_v_df, 'no_output', save_csv=False, visualize=False)
         # calculating Jaccard coefficients
         jcs_dict = calc_jaccard(nc_df, oc_df, cluster_cols, jcs_dict)
     # bootstrap averaging
@@ -64,31 +73,38 @@ def run_bootstrap(v_df, c_df, n, num_reps, json_output_path):
     return avg_jcs_dict
 
 
-def run_bootstrap_sl(v_df, c_df, n, num_reps, json_output_path):
-    # combine v_df, c_df so no errors when sampling
-    cv_df = v_df.merge(c_df)
+def run_bootstrap_sl(u_df, c_df, n, num_reps, json_output_path, num_clusters):
+    # combine u_df, c_df so no errors when sampling
+    cu_df = u_df.merge(c_df)
     # derive cols from the dataframe
     cluster_cols = list(c_df.columns)[1:]
-    ft_cols = list(v_df.columns)[1:]
+    ft_cols = list(u_df.columns)[1:]
     jcs_dict = create_bootstrap_dict(cluster_cols, c_df)
+    ari_scores = {key: [] for key in cluster_cols}
     for i in range(num_reps):
         # sampling + setting up data
-        sample_df = cv_df.sample(n=n, replace=True)
+        sample_df = cu_df.sample(n=n, replace=True)
         sample_df = sample_df.dropna(axis=1)
         oc_df = sample_df.loc[:, ['PatientSeqID'] + cluster_cols]  # storing original clusters for comparison
-        sample_v_df = sample_df.loc[:, ['PatientSeqID'] + ft_cols]
-        nc_df = make_clusters_sl(sample_v_df, 'no_output', save_csv=False, visualize=False)
+        sample_u_df = sample_df.loc[:, ['PatientSeqID'] + ft_cols]
+        nc_df, ss = make_clusters_sl(sample_u_df, 'no_output', 'no_output', save_csv=False, visualize=False, umap=True,
+                                     random=True, bootstrap=num_clusters)
         # calculating Jaccard coefficients
         jcs_dict = calc_jaccard(nc_df, oc_df, cluster_cols, jcs_dict)
+        # calculating Adjusted Rand Index
+        ari_scores = calc_ari(nc_df, oc_df, cluster_cols, ari_scores)
     # bootstrap averaging
     avg_jcs_dict = create_bootstrap_dict(cluster_cols, c_df)
+    avg_ari_scores = {key: [] for key in cluster_cols}
     for alg in cluster_cols:
+        avg_ari_scores[alg] = np.mean(np.array(ari_scores[alg]))
         for cl in jcs_dict[alg].keys():
             avg_jcs_dict[alg][cl] = np.mean(np.array(jcs_dict[alg][cl]))
     # save to json
     with open(json_output_path, "w") as outfile:
-        json.dump(avg_jcs_dict, outfile)
-    return avg_jcs_dict
+        bootstrap_dict = {'jaccard': avg_jcs_dict, 'ari': avg_ari_scores}
+        json.dump(bootstrap_dict, outfile)
+    return avg_jcs_dict, avg_ari_scores
 
 
 # TODO: need to unit-test
