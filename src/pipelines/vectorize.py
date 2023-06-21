@@ -55,6 +55,24 @@ def vectorize(df, dft_cols, sft_cols, windows):
     return pd.DataFrame(vs, columns=cols).set_index('PatientSeqID')
 
 
+# def c_vectorize(df, dft_cols, windows):
+#     df = df.sort_values(by=['PatientSeqID', 'DSB'])
+#     # vectorizing patient data into rows
+#     vs = list()
+#     ids = df.groupby('PatientSeqID').count().reset_index()['PatientSeqID']
+#     for p_id in tqdm(ids):
+#         p_df = df.loc[df['PatientSeqID'] == p_id]
+#         curr_v = [p_id]
+#         for ft in dft_cols:
+#             curr_v += list(p_df[ft])
+#         vs.append(curr_v)
+#     # column names for vectorized dataframe
+#     cols = ['PatientSeqID']
+#     for col in dft_cols:
+#         cols += [col + str(i) for i in range(windows)]
+#     return pd.DataFrame(vs, columns=cols).set_index('PatientSeqID')
+
+
 def make_dfs(df, grades, window_size, days, dft_cols, sft_cols, output_path):
     """
     will return full averaged dataframe acc to window size + will return a separate vectorized dataframe as tuple

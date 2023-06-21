@@ -12,6 +12,14 @@ from src.pipelines.cluster import make_clusters, make_UMAP, make_X, make_95_PCA,
 # Helper Functions                                                              #
 #################################################################################
 def calc_jaccard(newc_df, origc_df, columns, scores_dict):
+    """
+    takes two cluster dataframes and calculates Jaccard scores for each cluster in clustering
+    :param newc_df: pd dataframe with new cluster designations from a bootstrap replication
+    :param origc_df: pd dataframe with original cluster designations
+    :param columns: list of names of columns to calculate Jaccard score for
+    :param scores_dict: dictionary structured, {clustering_alg: {cluster 1: [score1, score2, ...], cluster 2: [...], }}
+    :return: scores_dict with jaccard scores appended for each cluster in each clustering
+    """
     for c_alg in columns:
         nc_clusters, oc_clusters = list(set(newc_df[c_alg])), list(set(origc_df[c_alg]))
         for o_clust in oc_clusters:
@@ -27,6 +35,14 @@ def calc_jaccard(newc_df, origc_df, columns, scores_dict):
 
 
 def calc_ari(newc_df, origc_df, columns, ari_scores_dict):
+    """
+    takes two cluster dataframes and calculates the adjusted rand index for similarity of clusterings
+    :param newc_df: pd dataframe with new cluster designations from a bootstrap replication
+    :param origc_df: pd dataframe with original cluster designations
+    :param columns: list of names of columns to calculate Jaccard score for
+    :param ari_scores_dict: dictionary structured, {clustering_alg: [score1, score2, ...]}
+    :return: ari_scores_dict with ari scores appended to list for each clustering algorithm
+    """
     for c_alg in columns:
         nc_clusters, oc_clusters = list((newc_df[c_alg])), list((origc_df[c_alg]))
         ari_score = adjusted_rand_score(nc_clusters, oc_clusters)
@@ -35,6 +51,12 @@ def calc_ari(newc_df, origc_df, columns, ari_scores_dict):
 
 
 def create_bootstrap_dict(columns, orig_df):
+    """
+    creates dictionary structure for the jaccard score_dict
+    :param columns: list of names of columns representing different clustering algorithms
+    :param orig_df: pd dataframe with cluster designations from original clustering
+    :return: dictionary ready to be used as scores_dict for jaccard scoring
+    """
     b_dict = dict()
     for alg in columns:
         alg_clusters = list(set(orig_df[alg]))
@@ -74,6 +96,17 @@ def run_bootstrap(v_df, c_df, n, num_reps, json_output_path):
 
 
 def run_bootstrap_sl(u_df, c_df, n, num_reps, json_output_path, num_clusters):
+    """
+    takes umap dataframe and original cluster clustering dataframe and creates num_reps bootstrap replications of size
+    n from the umap dataframe and evaluates ARI and Jaccard scores averaged over all bootstrap replications
+    :param u_df: pd dataframe with umap dimension reduced data
+    :param c_df: pd dataframe with clusterings
+    :param n: number of samples in bootstrap replication, size of bootstrap dataset
+    :param num_reps: number of replications
+    :param json_output_path: where to save evaluation metric scores
+    :param num_clusters: number of clusters to find in the clustering
+    :return:
+    """
     # combine u_df, c_df so no errors when sampling
     cu_df = u_df.merge(c_df)
     # derive cols from the dataframe

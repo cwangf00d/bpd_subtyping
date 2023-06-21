@@ -26,6 +26,10 @@ from tqdm import tqdm
 # Helper Functions                                                              #
 #################################################################################
 def make_X(df):
+    """
+    takes Pandas dataframe where first column is PatientSeqID, all other columns are encodings and returns a numpy
+    array of just data; order preserved
+    """
     # assuming the vectorized dataframes are all constructed with only column 0, PatientSeqID,
     # to be removed from the values
     X = df.iloc[:, 1:].values
@@ -34,7 +38,14 @@ def make_X(df):
 
 
 # Reduction #
-def make_2D_PCA(X, df, to_add=['Subgroup_A', 'Subgroup_B', 'Subgroup_BW', 'Subgroup_GA', 'PatientSeqID']):
+def make_2D_PCA(X, df, to_add=['PatientSeqID']):
+    """
+    makes 2D PCA reduction of data
+    :param X: np array of data
+    :param df: Pandas dataframe with columns to append to 2D reduction dataframe
+    :param to_add: list of names of columns to add
+    :return: dataframe with 2D PCA reduction and all other columns to add
+    """
     pca_2 = PCA(n_components=2)
     pc_2 = pca_2.fit_transform(X)
     pca_2_df = pd.DataFrame(data=pc_2, columns=['pc1', 'pc2'])
@@ -49,6 +60,11 @@ def make_2D_PCA(X, df, to_add=['Subgroup_A', 'Subgroup_B', 'Subgroup_BW', 'Subgr
 
 
 def make_95_PCA(X):
+    """
+    creates a Pandas dataframe with data reduced in dimensionality by PCA to cover 95% variance
+    :param X: np array with data
+    :return: pd dataframe with data only
+    """
     pca_95 = PCA(.95)
     pc_95 = pca_95.fit_transform(X)
     pca_95_df = pd.DataFrame(data=pc_95)
@@ -56,7 +72,14 @@ def make_95_PCA(X):
     return pca_95_df
 
 
-def make_2D_UMAP(X, df, subgroups=['Subgroup_A', 'Subgroup_B', 'Subgroup_BW', 'Subgroup_GA']):
+def make_2D_UMAP(X, df, subgroups=[]):
+    """
+    takes data from np array and reduces dimensionality to 2 dimensions using UMAP, will plot according to labeled
+    subgroups in dataframe with same order of points
+    :param X: np array with data
+    :param df: pd dataframe with same ordering, other labels
+    :param subgroups: list of names of columns to plot
+    """
     mapper = umap_.UMAP().fit(X)
     for sg in subgroups:
         plt.figure()
@@ -64,6 +87,15 @@ def make_2D_UMAP(X, df, subgroups=['Subgroup_A', 'Subgroup_B', 'Subgroup_BW', 'S
 
 
 def make_UMAP(X, n_n=15, n_c=10, min_d=0.1):
+    """
+    takes data from np array and reduces dimensionality to 10 dimensions using UMAP, with options to adjust number of
+    nearest neighbors, number of components, and effective minimum distance between points
+    :param X: np array with data
+    :param n_n: size of local neighborhood; default set to 15
+    :param n_c: number of components; dimension of space to embed into; default set to 10
+    :param min_d: effective minimum distance between embedding points; default set to 0.1
+    :return: pd dataframe with dimension reduced data, ordering preserved
+    """
     reducer = umap.umap_.UMAP(n_neighbors=n_n,  # default 15, The size of local neighborhood (in terms of number of
                               # neighboring sample points) used for manifold approximation.
                               n_components=n_c,  # default 2, The dimension of the space to embed into.
@@ -116,7 +148,7 @@ def make_UMAP(X, n_n=15, n_c=10, min_d=0.1):
                               verbose=False,  # default False, Controls verbosity of logging.
                               unique=False,  # default False, Controls if the rows of your data should be uniqued before
                               # being embedded.
-              )
+                              )
     umap_data = reducer.fit_transform(X)
     # Check the shape of the new data
     print('Shape of reduced matrix: ', umap_data.shape)
@@ -125,6 +157,12 @@ def make_UMAP(X, n_n=15, n_c=10, min_d=0.1):
 
 
 def create_cluster_df(df, to_add=['PatientSeqID']):
+    """
+    creates a new dataframe for storing cluster identities
+    :param df: pd dataframe from which we have columns to add to the new cluster df
+    :param to_add: list of names of columns to add
+    :return: new pd dataframe with columns kept
+    """
     new_df = pd.DataFrame()
     for col in to_add:
         new_df[col] = list(df.loc[:, col])
@@ -132,11 +170,23 @@ def create_cluster_df(df, to_add=['PatientSeqID']):
 
 
 def round_down_to_odd(f):
+    """
+    takes a number and rounds to get an odd number
+    :param f: float to round
+    :return: returns odd number rounded form of this float
+    """
     f = int(np.ceil(f))
     return f - 1 if f % 2 == 0 else f
 
 
 def find_distances(df, X, visualize=True):
+    """
+    takes dataframe with data and returns distances, for use in DBScan method
+    :param df: pd dataframe with data values
+    :param X: np array with data values
+    :param visualize: whether or not to plot
+    :return: distances for dbscan usage
+    """
     nearest_neighbors = NearestNeighbors(n_neighbors=round_down_to_odd(math.sqrt(df.shape[0])))
     neighbors = nearest_neighbors.fit(df)
     distances, indices = neighbors.kneighbors(df)
@@ -150,6 +200,16 @@ def find_distances(df, X, visualize=True):
 
 
 def find_dbscan_clusters(df, X, distances, min_dim, cluster_col_name, visualize=True):
+    """
+    using given distances and data, find number of DBScan clusters
+    :param df: pd dataframe with data
+    :param X: np array with data
+    :param distances: distances derived from find_distances function
+    :param min_dim: smallest dimension
+    :param cluster_col_name: string for name to put in as new column
+    :param visualize: whether or not to plot the clusters
+    :return: new cluster dataframe with DBScan clusters added as a column
+    """
     # finding eps
     i = np.arange(len(distances))
     knee = KneeLocator(i, distances, S=1, curve='convex', direction='increasing', interp_method='polynomial')
@@ -170,15 +230,18 @@ def find_dbscan_clusters(df, X, distances, min_dim, cluster_col_name, visualize=
     print('Estimated no. of noise points: %d' % n_noise)
     # returning dataframe with cluster results
     df[cluster_col_name] = dbscan_cluster.labels_
-    # TODO: figure this out, add in try-catch exception?
-#     cluster_labels = dbscan_cluster.fit_predict(X)
-#     print(cluster_labels)
-#     silhouette_avg = silhouette_score(X, cluster_labels)
-#     print('Average silhouette score:', silhouette_avg)
     return df
 
 
 def make_dbscan(data_df, cluster_df, X, cluster_col_name, visualize=True):
+    """
+    take data dataframe and find dbscan clusters, combines all in one
+    :param data_df: pd dataframe with data
+    :param cluster_df: pd dataframe for storing cluster identities
+    :param X: np array with data
+    :param cluster_col_name: name of column for new cluster col in col df
+    :param visualize: whether or not to plot
+    """
     distances = find_distances(data_df, X, visualize)
     min_dim = X.shape[1]
     cluster_df = find_dbscan_clusters(cluster_df, X, distances, min_dim, cluster_col_name, visualize)
@@ -188,6 +251,13 @@ def make_dbscan(data_df, cluster_df, X, cluster_col_name, visualize=True):
 
 
 def make_dendrogram(X, graph_title, visualize=True):
+    """
+    creating dendrogram to decide how many clusters to use in hierarchical clustering
+    :param X: np array with just data
+    :param graph_title: title of graph if visualizing
+    :param visualize: whether or not to plot dendrogram
+    :return:
+    """
     Z = shc.linkage(X, method='ward', metric='euclidean')
     c, cophenetic_dists = cophenet(Z, pdist(X))
     print('cophenetic coefficient:', c)
@@ -198,6 +268,14 @@ def make_dendrogram(X, graph_title, visualize=True):
 
 
 def make_hierarchical(X, cluster_df, num_clusters, col_name, visualize=True):
+    """
+    find the hierarchical clustering given number of clusters
+    :param X: np array with data
+    :param cluster_df: pd dataframe for storing clusters
+    :param num_clusters: number of clusters to find
+    :param col_name: name of column
+    :param visualize: whether or not to plot clusters
+    """
     cluster = AgglomerativeClustering(n_clusters=num_clusters, affinity='euclidean', linkage='ward')
     if visualize:
         plt.figure()
@@ -206,6 +284,12 @@ def make_hierarchical(X, cluster_df, num_clusters, col_name, visualize=True):
 
 
 def silhouette_hier_cluster(X, visualize=True):
+    """
+    takes data and finds optimal hierarchical clustering
+    :param X: np array with data
+    :param visualize:whether or not to plot
+    :return: number of clusters to find based on silhouette scores
+    """
     range_n_clusters = [2, 3, 4, 5, 6]
     avgs = []
     avg_dict = {}
@@ -269,6 +353,15 @@ def silhouette_hier_cluster(X, visualize=True):
 
 
 def silhouette_KM_clusterer(X, visualize=True, random=False, range_n_clusters=list(range(2, 7))):
+    """
+    takes data and tries out different numbers of clusters + measures silhouette score to find the number of clusters
+    with best silhouette score
+    :param X: np array with data
+    :param visualize: whether or not to plot the silhouette plots
+    :param random: whether or not to set a random state, False = not random, True = random
+    :param range_n_clusters: list of numbers of clusters to test
+    :return: number of clusters with highest silhouette score
+    """
     avgs = []
     avg_dict = {}
     for n_clusters in range_n_clusters:
@@ -382,6 +475,15 @@ def silhouette_KM_clusterer(X, visualize=True, random=False, range_n_clusters=li
 
 
 def make_kmeans(X, cluster_df, num_clusters, col_name, visualize=True):
+    """
+    takes data and fits a KMeans clustering with specified number of clusters
+    :param X: np array with data
+    :param cluster_df: pd dataframe for storing cluster designations as columns
+    :param num_clusters: number of clusters to find
+    :param col_name: name of column for storing cluster designations in df
+    :param visualize: whether to plot
+    :return: cluster dataframe with KMeans cluster column included
+    """
     kmeans = KMeans(n_clusters=num_clusters)
     y = kmeans.fit_predict(X)
     cluster_df[col_name] = y
@@ -391,6 +493,15 @@ def make_kmeans(X, cluster_df, num_clusters, col_name, visualize=True):
 
 
 def make_clusters(curr_df, output_path, save_csv=True, visualize=True):
+    """
+    takes dataframe and output path and finds clusters using DBScan, Hierarchical, KMeans clustering with PCA or UMAP
+    dimensionality reduction
+    :param curr_df: data to be clustered in dataframe
+    :param output_path: where to save the file
+    :param save_csv: whether to save a csv with cluster df
+    :param visualize: whether to plot
+    :return: dataframe with clusters
+    """
     # prep data + perform reduction
     curr_df = curr_df.dropna(axis=0)
     curr_X = make_X(curr_df)
@@ -429,18 +540,31 @@ def make_clusters(curr_df, output_path, save_csv=True, visualize=True):
 
 def make_clusters_sl(curr_df, c_output_path, u_output_path, save_csv=True, visualize=True, umap=False,
                      random=False, bootstrap=None):
+    """
+    streamlined clustering function, will take data and apply UMAP reduction + KMeans clustering
+    :param curr_df: dataframe with data
+    :param c_output_path: where to save cluster dataframe
+    :param u_output_path: where to save umap reduced dataframe
+    :param save_csv: whether to save csv (not used in bootstrap)
+    :param visualize: whether to visualize
+    :param umap: whether to create new umap reduction (not used in bootstrap)
+    :param random: whether to use a random_state, True == no random_state, False == random_state = 10
+    :param bootstrap: number of clusters (not used in bootstrap, is specified)
+    :return: tuple of cluster dataframe and silhouette score
+    """
     curr_df = curr_df.dropna(axis=0)
     umap_X = make_X(curr_df)
     if not umap:
         # prep data + perform reduction
-        umap_df = make_UMAP(umap_X, n_n=15, n_c=10, min_d=0.1)
+        # do pca upper bound for number of components in umap
+        umap_df = make_UMAP(umap_X, n_n=15, n_c=make_95_PCA(umap_X).shape[1], min_d=0.1)  # 128, 256,
         umap_X = umap_df.values
         umap_df.insert(loc=0, column='PatientSeqID', value=curr_df['PatientSeqID'])
         umap_df.to_csv(u_output_path, index=False)
     # prepare storage dataframe for clusters
     curr_cluster_df = create_cluster_df(curr_df, to_add=['PatientSeqID'])
     # run clustering algorithms
-    if not bootstrap:
+    if not bootstrap:  # if set to default, None, will go through this if statement
         km, ss = silhouette_KM_clusterer(umap_X, visualize, random)
         make_kmeans(umap_X, curr_cluster_df, km, 'umap_KMeans', visualize)
     else:
