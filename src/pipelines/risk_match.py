@@ -68,7 +68,6 @@ def jensen_risk(df):
     w_df.columns = ['PatientSeqID', 'DSB', 'Label'] + list(w_df.columns[3:])
     return w_df
 
-
 # def weighted_risk(df, ft_inds=range(3, 12)):
 #     weights = [i for i in range(9)]
 #     curr_df = df.iloc[:, ft_inds]*weights

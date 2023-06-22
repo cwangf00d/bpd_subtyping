@@ -35,7 +35,7 @@ def make_windows(df, w_size, grades, days):
     return pd.concat(mean_intervals).sort_values(by=['PatientSeqID', 'DSB'])
 
 
-def vectorize(df, dft_cols, sft_cols, windows):
+def vectorize(df, dft_cols, sft_cols, windows, condensed=False):
     df = df.sort_values(by=['PatientSeqID', 'DSB'])
     # vectorizing patient data into rows
     vs = list()
@@ -50,7 +50,10 @@ def vectorize(df, dft_cols, sft_cols, windows):
     # column names for vectorized dataframe
     cols = ['PatientSeqID']
     for col in dft_cols:
-        cols += [col + str(i) for i in range(windows)]
+        if condensed:
+            cols += [col + str(i) for i in range(28-windows, 28)]
+        else:
+            cols += [col + str(i) for i in range(windows)]
     cols += sft_cols
     return pd.DataFrame(vs, columns=cols).set_index('PatientSeqID')
 
@@ -73,7 +76,7 @@ def vectorize(df, dft_cols, sft_cols, windows):
 #     return pd.DataFrame(vs, columns=cols).set_index('PatientSeqID')
 
 
-def make_dfs(df, grades, window_size, days, dft_cols, sft_cols, output_path):
+def make_dfs(df, grades, window_size, days, dft_cols, sft_cols, output_path, condensed=False):
     """
     will return full averaged dataframe acc to window size + will return a separate vectorized dataframe as tuple
     """
@@ -81,7 +84,8 @@ def make_dfs(df, grades, window_size, days, dft_cols, sft_cols, output_path):
         w_df = make_windows(df, window_size, grades, days)
         w_df.to_csv(output_path + 'w_df.csv', index=False)
         v_df = vectorize(w_df, dft_cols, sft_cols, int(days/window_size))
-    v_df = vectorize(df, dft_cols, sft_cols, int(days))
+    windows = 28 - int(days) if condensed else int(days)
+    v_df = vectorize(df, dft_cols, sft_cols, windows)
     v_df.to_csv(output_path + 'v_df.csv')
     return v_df
 

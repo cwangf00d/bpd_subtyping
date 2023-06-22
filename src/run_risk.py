@@ -19,10 +19,10 @@ VDATA_DIR_PATH = DATA_DIR_PATH + 'processed/vector/'
 CDATA_DIR_PATH = DATA_DIR_PATH + 'processed/clusters/'
 SDATA_DIR_PATH = DATA_DIR_PATH + 'processed/scores/'
 RDATA_DIR_PATH = DATA_DIR_PATH + 'processed/risk/'
-print('variables set')
 
 # timeframes
 DAYS = [1, 3, 7, 14, 21, 27]
+
 
 # suffixes
 v_suffix = 'v_df.csv'
@@ -30,20 +30,34 @@ c_suffix = 'c_df.csv'
 u_suffix = 'u_df.csv'
 r_suffix = 'r_df.csv'
 
+print('variables set')
+
+
 ##########################################
 # Vectorize                              #
 ##########################################
-# # TRANSFORMER DATASETS
-tv_df = pd.read_csv(DATA_DIR_PATH + 'processed/full/tv_df.csv')  # includes all transformer encodings + BPD grade @ end
+# TRANSFORMER DATASETS
+# reading in internal/external embeddings + combining into one transformer csv
+ti_df = pd.read_csv(DATA_DIR_PATH + 'predictions/internal_embeddings.csv')
+te_df = pd.read_csv(DATA_DIR_PATH + 'predictions/external_embeddings.csv')
+t_cols = ['PatientSeqID', 'DSB', 'Support_Level_36'] + list(ti_df.columns)[3:]
+ti_df.columns, te_df.columns = t_cols, t_cols
+ta_df = pd.concat([ti_df, te_df])
+ta_df = ta_df.drop(columns=['Support_Level_36'])
+# merging to get bpd grade status + filter by inclusion criteria across specific days
+dis_df = pd.read_csv(DATA_DIR_PATH + 'discharge_bpd_status.csv')
+pm_df = pd.read_csv(DATA_DIR_PATH + 'patient_manifest.csv')
+tv_df = ta_df.merge((dis_df.merge(pm_df)).loc[:, ['PatientSeqID', 'BPD Grade']])
+tv_df.to_csv(DATA_DIR_PATH + 'processed/full/tv_df.csv')  # includes all transformer encodings + BPD grade @ end
 for day in DAYS:
     curr_df = tv_df.loc[tv_df['DSB'] >= day]
     T_DFT_COLS = list(tv_df.columns)[2:-1]  # daily feature columns in transformer dataframe
     T_SFT_COLS = list()  # single value columns in transformer dataframe
     # making new vectorized dataframes from day or risk matching onwards
     t_all_output = VDATA_DIR_PATH + 'tgac_d' + str(day) + '_'
-    make_dfs(curr_df, [0, 1, 2, 3], 1, day, T_DFT_COLS, T_SFT_COLS, t_all_output)
+    make_dfs(curr_df, [0, 1, 2, 3], 1, day, T_DFT_COLS, T_SFT_COLS, t_all_output, condensed=True)
 ''' now, the dataframes will all be in the format where each row = unique patient, and the rows are formatted
-    [PatientSeqID, DSB 0 dim 0, DSB 0 dim 1, ..., DSB 0 dim 127, DSB 1 dim 0, ..., DSB day dim 127]'''
+    [PatientSeqID, dim 0 DSB i, dim 0 DSB i+1, ..., dim 127 DSB 27]'''
 
 
 ##########################################
@@ -54,7 +68,7 @@ we are assuming that I already have a base transformer dataset <tar_df>, and jen
 access and use
 '''
 # to run over various timeframes and create risk datasets for each, we can use the following:
-tar_df = pd.read_csv(DATA_DIR_PATH + 'processed/full')
+tar_df = pd.read_csv(DATA_DIR_PATH + 'processed/full/tar_df.csv')
 vdfs = ['tgac_d1_', 'tgac_d3_', 'tgac_d7_', 'tgac_d14_', 'tgac_d21_', 'tgac_d27_']
 for day, vdf in zip(DAYS, vdfs):
     v_df = pd.read_csv(VDATA_DIR_PATH + vdf + v_suffix)
