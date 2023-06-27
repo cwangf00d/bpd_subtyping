@@ -352,13 +352,12 @@ def silhouette_hier_cluster(X, visualize=True):
     return avg_dict[np.max(np.array(avgs))]
 
 
-def silhouette_KM_clusterer(X, visualize=True, random=False, range_n_clusters=list(range(2, 7))):
+def silhouette_KM_clusterer(X, visualize=True, range_n_clusters=list(range(2, 7))):
     """
     takes data and tries out different numbers of clusters + measures silhouette score to find the number of clusters
     with best silhouette score
     :param X: np array with data
     :param visualize: whether or not to plot the silhouette plots
-    :param random: whether or not to set a random state, False = not random, True = random
     :param range_n_clusters: list of numbers of clusters to test
     :return: number of clusters with highest silhouette score
     """
@@ -367,10 +366,7 @@ def silhouette_KM_clusterer(X, visualize=True, random=False, range_n_clusters=li
     for n_clusters in range_n_clusters:
         # Initialize the clusterer with n_clusters value and a random generator
         # seed of 10 for reproducibility.
-        if not random:
-            clusterer = KMeans(n_clusters=n_clusters, random_state=10)
-        else:
-            clusterer = KMeans(n_clusters=n_clusters)
+        clusterer = KMeans(n_clusters=n_clusters, random_state=10)
         cluster_labels = clusterer.fit_predict(X)
 
         # The silhouette_score gives the average value for all the samples.
@@ -539,7 +535,7 @@ def make_clusters(curr_df, output_path, save_csv=True, visualize=True):
 
 
 def make_clusters_sl(curr_df, c_output_path, u_output_path, save_csv=True, visualize=True, umap=False,
-                     random=False, bootstrap=None):
+                     random=False, bootstrap=None, pca=False):
     """
     streamlined clustering function, will take data and apply UMAP reduction + KMeans clustering
     :param curr_df: dataframe with data
@@ -550,14 +546,18 @@ def make_clusters_sl(curr_df, c_output_path, u_output_path, save_csv=True, visua
     :param umap: whether to create new umap reduction (not used in bootstrap)
     :param random: whether to use a random_state, True == no random_state, False == random_state = 10
     :param bootstrap: number of clusters (not used in bootstrap, is specified)
+    :param pca: whether or not to set umap by pca constraints
     :return: tuple of cluster dataframe and silhouette score
     """
     curr_df = curr_df.dropna(axis=0)
     umap_X = make_X(curr_df)
     if not umap:
         # prep data + perform reduction
-        # do pca upper bound for number of components in umap
-        umap_df = make_UMAP(umap_X, n_n=15, n_c=make_95_PCA(umap_X).shape[1], min_d=0.1)  # 128, 256,
+        if not pca:
+            # do pca upper bound for number of components in umap
+            umap_df = make_UMAP(umap_X, n_n=15, n_c=make_95_PCA(umap_X).shape[1], min_d=0.1)  # 128, 256,
+        else:
+            umap_df = make_UMAP(umap_X, n_n=15, n_c=128, min_d=0.1)
         umap_X = umap_df.values
         umap_df.insert(loc=0, column='PatientSeqID', value=curr_df['PatientSeqID'])
         umap_df.to_csv(u_output_path, index=False)
@@ -565,10 +565,10 @@ def make_clusters_sl(curr_df, c_output_path, u_output_path, save_csv=True, visua
     curr_cluster_df = create_cluster_df(curr_df, to_add=['PatientSeqID'])
     # run clustering algorithms
     if not bootstrap:  # if set to default, None, will go through this if statement
-        km, ss = silhouette_KM_clusterer(umap_X, visualize, random)
+        km, ss = silhouette_KM_clusterer(umap_X, visualize)
         make_kmeans(umap_X, curr_cluster_df, km, 'umap_KMeans', visualize)
     else:
-        km, ss = silhouette_KM_clusterer(umap_X, visualize, random, range_n_clusters=[bootstrap])
+        km, ss = silhouette_KM_clusterer(umap_X, visualize, range_n_clusters=[bootstrap])
         make_kmeans(umap_X, curr_cluster_df, bootstrap, 'umap_KMeans', visualize)
     # save to csv
     if save_csv:
