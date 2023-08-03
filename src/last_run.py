@@ -42,7 +42,7 @@ tv_27_df = tv_df.loc[tv_df['DSB'] == 27]
 T_DFT_COLS = list(tv_27_df.columns)[2:-1]
 T_SFT_COLS = list()
 t_all_output = VDATA_DIR_PATH + 'lr_27_'
-make_dfs(tv_27_df, [-1, 0, 1, 2, 3], 1, 27, T_DFT_COLS, T_SFT_COLS, t_all_output, condensed=True)
+make_dfs(tv_27_df, [-1, 0, 1, 2, 3], 1, 27, T_DFT_COLS, T_SFT_COLS, t_all_output)
 
 # RISK MATCHING
 tar_df = pd.read_csv(DATA_DIR_PATH + 'processed/full/tar_df.csv')
