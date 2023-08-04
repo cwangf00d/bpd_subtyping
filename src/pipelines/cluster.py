@@ -352,6 +352,21 @@ def silhouette_hier_cluster(X, visualize=True):
     return avg_dict[np.max(np.array(avgs))]
 
 
+def make_thorough_kmeans(X, cluster_df, col_name, range_n_clusters=list(range(2, 7))):
+    avgs, avg_dict = [], {}
+    # iterate through all cluster number possibilities
+    for n_clusters in range_n_clusters:
+        # fit clusterer + find silhouette score
+        clusterer = KMeans(n_clusters=n_clusters, random_state=10)
+        cluster_labels = clusterer.fit_predict(X)
+        silhouette_avg = silhouette_score(X, cluster_labels)
+        print("For n_clusters =", n_clusters, "The average silhouette_score is :", silhouette_avg)
+        avgs.append(silhouette_avg)
+        avg_dict[silhouette_avg] = n_clusters
+        cluster_df[col_name + '_' + str(n_clusters)] = cluster_labels
+    return cluster_df
+
+
 def silhouette_KM_clusterer(X, visualize=True, range_n_clusters=list(range(2, 7))):
     """
     takes data and tries out different numbers of clusters + measures silhouette score to find the number of clusters
@@ -535,7 +550,7 @@ def make_clusters(curr_df, output_path, save_csv=True, visualize=True):
 
 
 def make_clusters_sl(curr_df, c_output_path, u_output_path, save_csv=True, visualize=True, umap=False,
-                     random=False, bootstrap=None, pca=False):
+                     bootstrap=None, pca=False):
     """
     streamlined clustering function, will take data and apply UMAP reduction + KMeans clustering
     :param curr_df: dataframe with data
@@ -575,3 +590,42 @@ def make_clusters_sl(curr_df, c_output_path, u_output_path, save_csv=True, visua
         curr_cluster_df.to_csv(c_output_path, index=False)
     else:
         return curr_cluster_df, ss
+
+
+def make_clusters_tsl(curr_df, c_output_path, u_output_path, save_csv=True, umap=False, bootstrap=None, pca=True):
+    """
+    ideal for thorough just KM clustering
+    :param curr_df:
+    :param c_output_path:
+    :param u_output_path:
+    :param save_csv:
+    :param visualize:
+    :param umap:
+    :param bootstrap:
+    :param pca:
+    :return:
+    """
+    curr_df = curr_df.dropna(axis=0)
+    umap_X = make_X(curr_df)
+    if not umap:
+        # prep data + perform reduction
+        if pca:
+            # do pca upper bound for number of components in umap
+            umap_df = make_UMAP(umap_X, n_n=15, n_c=make_95_PCA(umap_X).shape[1], min_d=0.1)  # 128, 256,
+        else:
+            umap_df = make_UMAP(umap_X, n_n=15, n_c=128, min_d=0.1)
+        umap_X = umap_df.values
+        umap_df.insert(loc=0, column='PatientSeqID', value=curr_df['PatientSeqID'])
+        umap_df.to_csv(u_output_path, index=False)
+    # prepare storage dataframe for clusters
+    curr_cluster_df = create_cluster_df(curr_df, to_add=['PatientSeqID'])
+    # run clustering algorithms
+    if not bootstrap:  # if set to default, None, will go through this if statement
+        make_thorough_kmeans(umap_X, curr_cluster_df, 'umap_KMeans')
+    else:
+        make_thorough_kmeans(umap_X, curr_cluster_df, 'umap_KMeans')
+    # save to csv
+    if save_csv:
+        curr_cluster_df.to_csv(c_output_path, index=False)
+    else:
+        return curr_cluster_df

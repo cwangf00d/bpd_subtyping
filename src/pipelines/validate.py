@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.metrics import silhouette_score, jaccard_score
 from sklearn.metrics.cluster import adjusted_rand_score
 import json
-from src.pipelines.cluster import make_clusters, make_UMAP, make_X, make_95_PCA, make_clusters_sl
+from src.pipelines.cluster import make_clusters, make_UMAP, make_X, make_95_PCA, make_clusters_sl, make_clusters_tsl
 
 
 #################################################################################
@@ -121,7 +121,50 @@ def run_bootstrap_sl(u_df, c_df, n, num_reps, json_output_path, num_clusters):
         oc_df = sample_df.loc[:, ['PatientSeqID'] + cluster_cols]  # storing original clusters for comparison
         sample_u_df = sample_df.loc[:, ['PatientSeqID'] + ft_cols]
         nc_df, ss = make_clusters_sl(sample_u_df, 'no_output', 'no_output', save_csv=False, visualize=False, umap=True,
-                                     random=True, bootstrap=num_clusters)
+                                     bootstrap=num_clusters)
+        # calculating Jaccard coefficients
+        jcs_dict = calc_jaccard(nc_df, oc_df, cluster_cols, jcs_dict)
+        # calculating Adjusted Rand Index
+        ari_scores = calc_ari(nc_df, oc_df, cluster_cols, ari_scores)
+    # bootstrap averaging
+    avg_jcs_dict = create_bootstrap_dict(cluster_cols, c_df)
+    avg_ari_scores = {key: [] for key in cluster_cols}
+    for alg in cluster_cols:
+        avg_ari_scores[alg] = np.mean(np.array(ari_scores[alg]))
+        for cl in jcs_dict[alg].keys():
+            avg_jcs_dict[alg][cl] = np.mean(np.array(jcs_dict[alg][cl]))
+    # save to json
+    with open(json_output_path, "w") as outfile:
+        bootstrap_dict = {'jaccard': avg_jcs_dict, 'ari': avg_ari_scores}
+        json.dump(bootstrap_dict, outfile)
+    return avg_jcs_dict, avg_ari_scores
+
+
+def run_bootstrap_tsl(u_df, c_df, n, num_reps, json_output_path):
+    """
+    takes umap dataframe and original cluster clustering dataframe and creates num_reps bootstrap replications of size
+    n from the umap dataframe and evaluates ARI and Jaccard scores averaged over all bootstrap replications
+    :param u_df: pd dataframe with umap dimension reduced data
+    :param c_df: pd dataframe with clusterings
+    :param n: number of samples in bootstrap replication, size of bootstrap dataset
+    :param num_reps: number of replications
+    :param json_output_path: where to save evaluation metric scores
+    :return:
+    """
+    # combine u_df, c_df so no errors when sampling
+    cu_df = u_df.merge(c_df)
+    # derive cols from the dataframe
+    cluster_cols = list(c_df.columns)[1:]
+    ft_cols = list(u_df.columns)[1:]
+    jcs_dict = create_bootstrap_dict(cluster_cols, c_df)
+    ari_scores = {key: [] for key in cluster_cols}
+    for i in range(num_reps):
+        # sampling + setting up data
+        sample_df = cu_df.sample(n=n, replace=True)
+        sample_df = sample_df.dropna(axis=1)
+        oc_df = sample_df.loc[:, ['PatientSeqID'] + cluster_cols]  # storing original clusters for comparison
+        sample_u_df = sample_df.loc[:, ['PatientSeqID'] + ft_cols]
+        nc_df = make_clusters_tsl(sample_u_df, 'no_output', 'no_output', save_csv=False, umap=True)
         # calculating Jaccard coefficients
         jcs_dict = calc_jaccard(nc_df, oc_df, cluster_cols, jcs_dict)
         # calculating Adjusted Rand Index
