@@ -15,7 +15,6 @@ RDATA_DIR_PATH = DATA_DIR_PATH + 'processed/risk/'
 # timeframes
 DAYS = [1, 3, 7, 14, 21, 27]
 
-
 # suffixes
 v_suffix = 'v_df.csv'
 c_suffix = 'c_df.csv'
