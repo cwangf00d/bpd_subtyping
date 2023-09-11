@@ -24,37 +24,47 @@ u_suffix = 'u_df.csv'
 r_suffix = 'r_df.csv'
 print('variables set')
 
-# we have a larger vectorization with all the grades in the lr_1_v_df.csv, etc. We need to risk match
-# RISK MATCHING
-tar_df = pd.read_csv(DATA_DIR_PATH + 'processed/full/tar_df.csv')
-for day in DAYS:
-    v_df = pd.read_csv(VDATA_DIR_PATH + 'lr_' + str(day) + '_' + v_suffix)
-    matched_risk(tar_df, v_df, day, DATA_DIR_PATH + '/processed/risk/do_')
+# # we have a larger vectorization with all the grades in the lr_1_v_df.csv, etc. We need to risk match
+# # RISK MATCHING
+# tar_df = pd.read_csv(DATA_DIR_PATH + 'processed/full/tar_df.csv')
+# for day in DAYS:
+#     v_df = pd.read_csv(VDATA_DIR_PATH + 'lr_' + str(day) + '_' + v_suffix)
+#     matched_risk(tar_df, v_df, day, DATA_DIR_PATH + '/processed/risk/do_')
+#
+# # CLUSTERING, will focus on grade 3
+# to_cluster = ['do_d1g0_', 'do_d1g1_', 'do_d1g2_', 'do_d1g3_', 'do_d1g4_',
+#               'do_d3g0_', 'do_d3g1_', 'do_d3g2_', 'do_d3g3_', 'do_d3g4_',
+#               'do_d7g0_', 'do_d7g1_', 'do_d7g2_', 'do_d7g3_', 'do_d7g4_',
+#               'do_d14g0_', 'do_d14g1_', 'do_d14g2_', 'do_d14g3_', 'do_d14g4_',
+#               'do_d21g0_', 'do_d21g1_', 'do_d21g2_', 'do_d21g3_', 'do_d21g4_',
+#               'do_d27g0_', 'do_d27g1_', 'do_d27g2_', 'do_d27g3_', 'do_d27g4_']
+#
+# for dataset in to_cluster:
+#     print('loading', dataset)
+#     curr_df = pd.read_csv(RDATA_DIR_PATH + dataset + r_suffix)
+#     make_clusters_tsl(curr_df, CDATA_DIR_PATH + dataset + 't' + c_suffix, CDATA_DIR_PATH + dataset + 't' + u_suffix)
+#     print(dataset, 'cluster complete')
+# print('all clusters complete')
+#
+# # BOOTSTRAP REPLICATIONS!
+# BOOTSTRAP_REPS = 100
+# cluster_cols = 'umap_KMeans'
+# for data in to_cluster:
+#     print('loading in', data)
+#     curr_c_df = pd.read_csv(CDATA_DIR_PATH + data + 't' + c_suffix)
+#     curr_u_df = pd.read_csv(CDATA_DIR_PATH + data + 't' + u_suffix)
+#     curr_n = curr_c_df.shape[0]
+#     bs_output = SDATA_DIR_PATH + data + 'tbs.json'
+#     run_bootstrap_tsl(curr_u_df, curr_c_df, curr_n, BOOTSTRAP_REPS, bs_output)
+#     print('bootstrap complete!')
 
-# CLUSTERING, will focus on grade 3
-to_cluster = ['do_d1g0_', 'do_d1g1_', 'do_d1g2_', 'do_d1g3_', 'do_d1g4_',
-              'do_d3g0_', 'do_d3g1_', 'do_d3g2_', 'do_d3g3_', 'do_d3g4_',
-              'do_d7g0_', 'do_d7g1_', 'do_d7g2_', 'do_d7g3_', 'do_d7g4_',
-              'do_d14g0_', 'do_d14g1_', 'do_d14g2_', 'do_d14g3_', 'do_d14g4_',
-              'do_d21g0_', 'do_d21g1_', 'do_d21g2_', 'do_d21g3_', 'do_d21g4_',
-              'do_d27g0_', 'do_d27g1_', 'do_d27g2_', 'do_d27g3_', 'do_d27g4_']
+# vectorizing for feature importance analysis
 
-for dataset in to_cluster:
-    print('loading', dataset)
-    curr_df = pd.read_csv(RDATA_DIR_PATH + dataset + r_suffix)
-    make_clusters_tsl(curr_df, CDATA_DIR_PATH + dataset + 't' + c_suffix, CDATA_DIR_PATH + dataset + 't' + u_suffix)
-    print(dataset, 'cluster complete')
-print('all clusters complete')
-
-# BOOTSTRAP REPLICATIONS!
-BOOTSTRAP_REPS = 100
-cluster_cols = 'umap_KMeans'
-for data in to_cluster:
-    print('loading in', data)
-    curr_c_df = pd.read_csv(CDATA_DIR_PATH + data + 't' + c_suffix)
-    curr_u_df = pd.read_csv(CDATA_DIR_PATH + data + 't' + u_suffix)
-    curr_n = curr_c_df.shape[0]
-    bs_output = SDATA_DIR_PATH + data + 'tbs.json'
-    run_bootstrap_tsl(curr_u_df, curr_c_df, curr_n, BOOTSTRAP_REPS, bs_output)
-    print('bootstrap complete!')
-
+# manual vectorization, all grades
+mv_df = pd.read_csv(DATA_DIR_PATH + 'processed/full/mv_df.csv')
+m_all_output = VDATA_DIR_PATH + 'fi_all'
+time_window = 1
+DFT_COLS = list(mv_df.columns)[3:435]  # daily feature columns in manual dataframe
+SFT_COLS = list(mv_df.columns)[435:-1]  # single value columns in manual dataframe
+days = 27
+make_dfs(mv_df, [0, 1, 2, 3], time_window, days, DFT_COLS, SFT_COLS, m_all_output + 't' + str(time_window))
